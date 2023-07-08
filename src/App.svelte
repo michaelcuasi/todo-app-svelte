@@ -36,14 +36,12 @@
 
   async function handleAddtodo(event) {
     event.preventDefault()
-    console.log(document.querySelectorAll('.todo-list ul li'))
     todos = [...todos, {
       title: event.detail.title,
       id: uuid(),
       completed: false
     }]
     await tick()
-    console.log(document.querySelectorAll('.todo-list ul li'))
 
     todoList.clearInput()
 
@@ -87,7 +85,7 @@
  </label>
 
  {#if showList}
-  <div style:max-width='200px'>
+  <div style:max-width='400px'>
     <Todolist
         {todos} 
         bind:this={todoList}
