@@ -3,13 +3,20 @@
 <script>
   import Button from "./Button.svelte";
   import { afterUpdate, createEventDispatcher } from "svelte";
-  import MdDelete from 'svelte-icons/md/MdDelete.svelte'
+  import TiDelete from "svelte-icons/ti/TiDelete.svelte"  
+  import { flip } from "svelte/animate";
+  import { scale, crossfade } from "svelte/transition";
   // import { v4 as uuid } from "uuid"; 
 
   export let todos = null
   export let error = null
   export let isLoading = false
   export let disableAdding = false
+  export let disabledItems = []
+  // export let scrollOnAdd = undefined
+  $: done = todos ? todos.filter(todo => todo.completed) : []
+  $: todo = todos ? todos.filter(todo => !todo.completed) : []
+
   let prevTodos = todos
   let input, listDiv, autoscroll, listDivScrollHeight;
   let inputText = '';
@@ -31,10 +38,29 @@
       input.focus()
   }
 
-  afterUpdate(() => {
+  afterUpdate(() => {   
       if (autoscroll) listDiv.scrollTo(0, listDivScrollHeight)
       autoscroll = false
+    }
+  )
+
+  const [send, receive] = crossfade({
+    duration: 400,
+    fallback(node) {
+      return scale(node, {start: 0.5, duration: 300})
+    }
   })
+
+  // afterUpdate(() => {
+  //   if(scrollOnAdd) {
+  //     let pos; 
+  //     if(scrollOnAdd === 'top') pos = 0
+  //     if(scrollOnAdd === 'bottom') pos = listDivScrollHeight
+      
+  //     if (autoscroll) listDiv.scrollTo(0, pos)
+  //     autoscroll = false
+  //   }
+  // })
 
   function handleAddTodo() { 
     const isNotCancelled = dispatch('addtodo', {
@@ -79,24 +105,44 @@
         {#if todos.length === 0}
           <p class="state-text">No Todos yet</p>
         {:else}
-          <ul>
-            {#each todos as {id, title, completed} (id)}
-              <li class:completed>
-                <label>
-                  <input type="checkbox" checked={completed} on:input={(event) => {
-                      event.currentTarget.checked = completed
-                      handleToggleTodo(id, !completed)
-                  }}>
-                  {title}
-                  <button class="remove-todo-button" aria-label="Remove todo: {title}" on:click={() => handleRemoveTodo(id)}>
-                      <span style:width="10px" style:display="inline-block">
-                          <MdDelete/>
-                      </span>
-                  </button>
-                </label>
-              </li>
+          <div style:display="flex">
+            {#each [todo, done] as list, index}
+              <div class="list-wrapper">
+                <h2>{index === 0 ? "Todo" : "Done"}</h2>
+                <ul>
+                  {#each list as todo, index (todo.id)}
+                  {@const {id, completed, title} = todo}
+                  <li animate:flip={{duration: 300}}>
+                    <slot {todo} {index} {handleToggleTodo}>
+                      <div in:receive|local={{key: id}} out:send|local={{key: id}} class:completed>
+                        <label>
+                          <input
+                            type="checkbox"
+                            disabled={disabledItems.includes(id)}
+                            checked={completed}
+                            on:input={(event) => {
+                              event.currentTarget.checked = completed
+                              handleToggleTodo(id, !completed)
+                          }}>
+                          <slot name='title'>{title}</slot>
+                          <button
+                            class="remove-todo-button"
+                            disabled={disabledItems.includes(id)}
+                            aria-label="Remove todo: {title}"
+                            on:click={() => handleRemoveTodo(id)}>
+                              <span style:width="10px" style:display="inline-block">
+                                  <TiDelete/>
+                              </span>
+                          </button>
+                        </label>
+                      </div>
+                    </slot>
+                  </li>
+                  {/each}
+                </ul>
+              </div>
             {/each}
-          </ul>
+          </div>
         {/if}
       </div>
     </div>
@@ -117,13 +163,18 @@
       text-align: center;
     }
     .todo-list {
-      max-height: 200px;
+      max-height: 400px;
       overflow: auto;
+      .list-wrapper {
+        flex: 1;
+        padding: 10px;
+        margin: 0 0 10px 0;
+      }
       ul {
         margin: 0;
-        padding: 10px;
+        padding: 0px;
         list-style: none;
-        li {
+        li > div {
           margin-bottom: 5px;
           display: flex;
           align-items: center;
@@ -154,6 +205,10 @@
             right: 10px;
             cursor: pointer;
             display: none;
+            &:disabled {
+              opacity: 0.4;
+              cursor: not-allowed;
+            }
             :global(svg) {
               fill: #bd1414;
             }
@@ -187,5 +242,4 @@
       }
     }
   }
- 
 </style>

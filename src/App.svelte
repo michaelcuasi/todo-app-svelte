@@ -5,7 +5,9 @@
   import Todolist from "./lib/Todolist.svelte";
   import {v4 as uuid} from "uuid"
   import { onMount, tick } from "svelte";
-  
+  import { fly } from "svelte/transition";
+  import spin from "./lib/transition/spin";  
+
   let todoList;
   let showList = true
   
@@ -13,6 +15,7 @@
   let error = null
   let isLoading = false
   let isAdding = false
+  let disabledItems = []
   
   // let promise = loadTodos()
 
@@ -62,7 +65,7 @@
       }).then(async (response) => {
         if(response.ok) {
           const todo = await response.json()
-          todos = [...todos, {...todo, id: uuid()}]
+          todos = [...todos, {...todo, id: uuid()},  ]
 
           todoList.clearInput()
           // console.log(todo)
@@ -90,23 +93,50 @@
     // }, 3000)    
   }
 
-  function handleToggleTodo(event) {
-    // console.log(event.detail.id, event.detail.value)
-    todos = todos.map(todo => {
-      if(todo.id === event.detail.id) {
-        return { ...todo, completed: event.detail.value}
+  async function handleToggleTodo(event) {
+    const id = event.detail.id
+    const value = event.detail.value
+    if(disabledItems.includes(id)) return;
+    disabledItems = [...disabledItems, id]
+    await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        completed: value
+      }),
+      headers: {
+        'Content-type': 'application/json; charset=UTF-8'
       }
-      return {...todo}
+    }).then(async (response) => {
+      if(response.ok) {
+        const updatedTodo = await response.json()
+        todos = todos.map(todo => {
+          if(todo.id === id) {
+            return updatedTodo
+          }
+          return {...todo}
+        })
+      } else {
+        alert('An error has occured')
+      } 
     })
-    console.log(todos)
+    disabledItems = disabledItems.filter((itemId) => itemId !== id)
   }
 
-  function handleRemoveTodo(event) {
-    // console.log(event.detail.id)
-    todos = todos.filter(todo => todo.id !== event.detail.id)
-    // console.log(todos)
+  async function handleRemoveTodo(event) {
+    const id = event.detail.id
+    if(disabledItems.includes(id)) return;
+    disabledItems = [...disabledItems, id]
+    await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`, {
+      method: 'DELETE',
+      }).then((response) => {
+        if(response.ok) {
+          todos = todos.filter(todo => todo.id !== event.detail.id)
+        } else {
+          alert('An error has occured')
+        }
+      })
+      disabledItems = disabledItems.filter((itemId) => itemId !== id)
   }
-
 </script>
 
 <!-- <Todolist bind:todos /> -->
@@ -119,18 +149,56 @@
  </label>
 
  {#if showList}
-  <div style:max-width='400px'>
+ <!-- <div
+  style:max-width='800px'
+  style="opacity = 0.5"
+  transition:spin={{spin: 6}}
+  > -->
+  <div
+    style:max-width='800px'
+    style="opacity = 0.5"
+  >
     <Todolist
       {todos} 
       {isLoading}
       {error}
+      {disabledItems}
       disableAdding={isAdding}
       bind:this={todoList}
       on:addtodo={handleAddtodo} 
       on:removetodo={handleRemoveTodo}
       on:toggletodo={handleToggleTodo}
-    />
+      let:todo
+      let:handleToggleTodo
+      let:index
+    >
+    <!-- <svelte:fragment slot='title'>{index + 1} - {todo.title}</svelte:fragment> -->
+      <!-- {@const {id, completed, title} = todo}
+      <div>
+        <input
+          type="checkbox"
+          disabled={disabledItems.includes(id)}
+          checked={completed}
+          on:input={(event) => {
+            event.currentTarget.checked = completed
+            handleToggleTodo(id, !completed)
+        }} />
+        {title}
+      </div> -->
+    </Todolist>
   </div>
+
+  {#if todos}
+    <p>Number of todos: 
+      {#key todos.length}
+        <span 
+          style:display="inline-block" 
+          in:fly|local={{y: -10}}>
+            {todos.length}
+        </span>
+      {/key} 
+  {/if} 
+
   <!-- {#await promise}
     <p>Loading.....</p>
     {:then todos}
